@@ -98,17 +98,21 @@ if __name__ == "__main__":
         main_task = loop.create_task(main())
         loop.run_until_complete(main_task)
     except asyncio.CancelledError:
-        logging.info("Основная задача была отменена. Бот останавливается.")
+        logging.info("Основная задача была отменена. Начинаем процедуру остановки.")
+        # Даем задачам на завершение немного времени
+        tasks = [t for t in asyncio.all_tasks(loop=loop) if t is not main_task and not t.done()]
+        if tasks:
+            logging.info(f"Ожидание завершения {len(tasks)} фоновых задач...")
+            loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+            logging.info("Все фоновые задачи завершены.")
     except (KeyboardInterrupt, SystemExit):
-        # Этот блок для локального запуска (Ctrl+C)
+        # Этот блок для локального запуска (Ctrl+C), но основной обработчик - signal_handler
         logging.info("Бот остановлен вручную.")
     except Exception as e:
         logging.critical(f"Критическая ошибка при запуске бота: {e}", exc_info=True)
     finally:
-        # Даем задачам на завершение немного времени
-        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-        if tasks:
-            logging.info(f"Ожидание завершения {len(tasks)} фоновых задач...")
-            loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
-        loop.close()
-        logging.info("Цикл событий закрыт. Выход.")
+        if loop.is_closed():
+            logging.info("Цикл событий уже закрыт.")
+        else:
+            loop.close()
+            logging.info("Цикл событий закрыт.")
