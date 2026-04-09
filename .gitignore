@@ -1,0 +1,32 @@
+# Environment variables
+.env
+bot/.env
+
+# Python virtual environment
+bot/.venv/
+.venv/
+env/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+PyCache/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyc
+
+# macOS system files
+.DS_Store
+
+# Build artifacts
+.aider*
+.git-rewrite/
+*.log
+docs/catalog/images/*.jpeg
+__pycache__/
+**/__pycache__/
+*.pyc
