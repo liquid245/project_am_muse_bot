@@ -3,10 +3,11 @@ import logging
 import signal
 
 import aiohttp
+from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from config import BOT_TOKEN
+from config import BOT_TOKEN, HEALTH_CHECK_HOST, HEALTH_CHECK_PORT
 
 # Импорт роутеров
 from functions.common import common_router
@@ -17,17 +18,29 @@ from functions.orders import orders_router
 TELEGRAM_API_URL = "https://api.telegram.org"
 
 
+async def health_check(request: web.Request) -> web.Response:
+    """Обработчик для health check эндпоинта."""
+    return web.Response(text="OK")
+
+
 async def on_startup(bot: Bot):
     """Логирование при запуске бота."""
     bot_info = await bot.get_me()
     logging.info(f"Бот AM Muse (Refactored) запущен: @{bot_info.username} (ID: {bot_info.id})")
 
 
-async def on_shutdown(bot: Bot):
-    """Логирование при остановке бота."""
+async def on_shutdown(bot: Bot, web_runner: web.AppRunner):
+    """Логирование и корректное завершение работы сервера и бота."""
+    logging.warning("Начало процедуры остановки...")
     bot_info = await bot.get_me()
+
+    logging.info("Остановка health check сервера...")
+    await web_runner.cleanup()
+    logging.info("Health check сервер остановлен.")
+
     logging.warning(f"Бот AM Muse (Refactored) остановлен: @{bot_info.username} (ID: {bot_info.id})")
     await bot.session.close()
+    logging.info("Сессия бота закрыта.")
 
 
 async def is_telegram_reachable(timeout: float = 5.0) -> bool:
@@ -43,7 +56,7 @@ async def is_telegram_reachable(timeout: float = 5.0) -> bool:
 
 
 async def main():
-    """Основная функция запуска бота."""
+    """Основная функция запуска бота и health check сервера."""
     if not BOT_TOKEN:
         logging.critical("BOT_TOKEN не найден в переменных окружения! Бот не может быть запущен.")
         return
@@ -54,9 +67,20 @@ async def main():
             "Бот не может быть запущен."
         )
         return
+        
+    # Настройка и запуск aiohttp сервера
+    app = web.Application()
+    app.router.add_get("/", health_check)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, HEALTH_CHECK_HOST, HEALTH_CHECK_PORT)
+    await site.start()
+    logging.info(f"Health check сервер запущен на http://{HEALTH_CHECK_HOST}:{HEALTH_CHECK_PORT}")
 
+    # Настройка и запуск бота
     bot = Bot(token=BOT_TOKEN)
-    dp = Dispatcher(storage=MemoryStorage())
+    # Передаем runner в Dispatcher для доступа в on_shutdown
+    dp = Dispatcher(storage=MemoryStorage(), web_runner=runner)
 
     # Регистрация middleware
     from utils.media_handler import MediaGroupMiddleware
@@ -72,6 +96,7 @@ async def main():
     dp.include_router(edit_router)
     dp.include_router(orders_router)
 
+    # Запуск polling'а
     await dp.start_polling(bot)
 
 
