@@ -4,7 +4,10 @@ import signal
 
 import aiohttp
 from aiohttp import web
+from aiohttp.client_exceptions import ClientOSError
+from aiohttp_retry import RetryClient, RetryOptions
 from aiogram import Bot, Dispatcher
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import BOT_TOKEN, HEALTH_CHECK_HOST, HEALTH_CHECK_PORT
@@ -78,7 +81,20 @@ async def main():
     logging.info(f"Health check сервер запущен на http://{HEALTH_CHECK_HOST}:{HEALTH_CHECK_PORT}")
 
     # Настройка и запуск бота
-    bot = Bot(token=BOT_TOKEN)
+    retry_options = RetryOptions(
+        attempts=5,  # 5 попыток
+        delay=1,  # задержка 1 секунда
+        max_delay=60,  # максимальная задержка 60 секунд
+        factor=2,  # экспоненциальный рост задержки
+        statuses=[500, 502, 503, 504],  # статусы для повтора
+        exceptions={ClientOSError, asyncio.TimeoutError}  # исключения для повтора
+    )
+    
+    # Создаем сессию с автоматическими повторами
+    session = AiohttpSession(client=RetryClient(retry_options=retry_options))
+    
+    # Настройка и запуск бота
+    bot = Bot(token=BOT_TOKEN, session=session)
     # Передаем runner в Dispatcher для доступа в on_shutdown
     dp = Dispatcher(storage=MemoryStorage(), web_runner=runner)
 

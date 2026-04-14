@@ -4,3 +4,4 @@ python-dotenv
 qrcode
 Pillow
 aiohttp-socks
+aiohttp-retry
