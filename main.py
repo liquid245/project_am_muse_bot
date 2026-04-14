@@ -5,7 +5,7 @@ import signal
 import aiohttp
 from aiohttp import web
 from aiohttp.client_exceptions import ClientOSError
-from aiohttp_retry import RetryClient, RetryOptions
+from aiohttp_retry import RetryClient, ExponentialRetry
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -81,17 +81,21 @@ async def main():
     logging.info(f"Health check сервер запущен на http://{HEALTH_CHECK_HOST}:{HEALTH_CHECK_PORT}")
 
     # Настройка и запуск бота
-    retry_options = RetryOptions(
-        attempts=5,  # 5 попыток
-        delay=1,  # задержка 1 секунда
-        max_delay=60,  # максимальная задержка 60 секунд
-        factor=2,  # экспоненциальный рост задержки
-        statuses=[500, 502, 503, 504],  # статусы для повтора
-        exceptions={ClientOSError, asyncio.TimeoutError}  # исключения для повтора
+    retry_options = ExponentialRetry(
+        attempts=5,
+        start_timeout=1,
+        max_timeout=60,
+        factor=2,
+        statuses=[500, 502, 503, 504],
+        exceptions={ClientOSError, asyncio.TimeoutError},
     )
     
     # Создаем сессию с автоматическими повторами
-    session = AiohttpSession(client=RetryClient(retry_options=retry_options))
+    # aiogram's AiohttpSession passes all kwargs to BaseSession.__init__
+    # which does not accept 'client'. So we instantiate it without client
+    # and then manually set the _client attribute.
+    session = AiohttpSession()
+    session._client = RetryClient(retry_options=retry_options)
     
     # Настройка и запуск бота
     bot = Bot(token=BOT_TOKEN, session=session)
@@ -116,6 +120,47 @@ async def main():
     await dp.start_polling(bot)
 
 
+def handle_exception(loop, context):
+    msg = context.get("exception", context["message"])
+    logging.error(f"Caught exception: {msg}")
+
+async def main_wrapper():
+    """Wrapper for main() to handle startup and shutdown gracefully."""
+    loop = asyncio.get_running_loop()
+
+    # Add custom exception handler for the loop
+    loop.set_exception_handler(handle_exception)
+
+    # Signal handlers for graceful shutdown
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(shutdown(loop, s)))
+
+    try:
+        await main()
+    except asyncio.CancelledError:
+        logging.info("Main task cancelled. Initiating graceful shutdown.")
+    except Exception as e:
+        logging.critical(f"Critical error during bot runtime: {e}", exc_info=True)
+
+
+async def shutdown(loop, signal=None):
+    """Gracefully shuts down all running tasks and the event loop."""
+    if signal:
+        logging.warning(f"Received exit signal {signal.name}. Initiating graceful shutdown...")
+    
+    # Cancel all running tasks
+    tasks = [t for t in asyncio.all_tasks(loop=loop) if t is not asyncio.current_task()]
+    for task in tasks:
+        task.cancel()
+    
+    # Wait for all tasks to complete or be cancelled
+    await asyncio.gather(*tasks, return_exceptions=True)
+    logging.info("All background tasks cancelled.")
+
+    loop.stop()
+    logging.info("Event loop stopped.")
+
+
 if __name__ == "__main__":
     # Настройка логирования
     logging.basicConfig(
@@ -123,37 +168,11 @@ if __name__ == "__main__":
         format="%(asctime)s - %(levelname)s - %(name)s - [%(funcName)s] - %(message)s",
     )
 
-    loop = asyncio.get_event_loop()
-    main_task = None
-
-    def signal_handler(signum, frame):
-        logging.warning(f"Получен сигнал {signal.strsignal(signum)}. Завершение работы...")
-        if main_task:
-            main_task.cancel()
-
-    # Устанавливаем обработчики для SIGINT и SIGTERM
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
     try:
-        main_task = loop.create_task(main())
-        loop.run_until_complete(main_task)
-    except asyncio.CancelledError:
-        logging.info("Основная задача была отменена. Начинаем процедуру остановки.")
-        # Даем задачам на завершение немного времени
-        tasks = [t for t in asyncio.all_tasks(loop=loop) if t is not main_task and not t.done()]
-        if tasks:
-            logging.info(f"Ожидание завершения {len(tasks)} фоновых задач...")
-            loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
-            logging.info("Все фоновые задачи завершены.")
+        asyncio.run(main_wrapper())
     except (KeyboardInterrupt, SystemExit):
-        # Этот блок для локального запуска (Ctrl+C), но основной обработчик - signal_handler
-        logging.info("Бот остановлен вручную.")
+        logging.info("Bot stopped manually by KeyboardInterrupt or SystemExit.")
     except Exception as e:
-        logging.critical(f"Критическая ошибка при запуске бота: {e}", exc_info=True)
+        logging.critical(f"Unhandled critical error: {e}", exc_info=True)
     finally:
-        if loop.is_closed():
-            logging.info("Цикл событий уже закрыт.")
-        else:
-            loop.close()
-            logging.info("Цикл событий закрыт.")
+        logging.info("Application finished.")
