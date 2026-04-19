@@ -71,8 +71,6 @@ async def cancel_order(callback_query: types.CallbackQuery, state: FSMContext):
 
             if target_item:
                 target_item["stock"] = target_item.get("stock", 0) + 1
-                if target_item["stock"] > 0:
-                    target_item["status"] = "available"
                 storage_manager.update_catalog(target_item)
                 logging.info(f"Товар {item_id} возвращен на склад после отмены заказа.")
         except Exception as e:
@@ -146,8 +144,6 @@ async def process_address(message: types.Message, state: FSMContext):
             if str(item.get("id")) == str(item_id):
                 if item.get("stock", 0) > 0:
                     item["stock"] -= 1
-                    if item["stock"] == 0:
-                        item["status"] = "sold"
                     target_item = item
                 break
 

@@ -150,7 +150,6 @@ async def save_item_final(callback: types.CallbackQuery, state: FSMContext):
             "description": data["description"],
             "price": data["price"],
             "stock": data["stock"],
-            "status": "available",
             "created_at": today,
             "images": saved_image_filenames,
             "image_sources": image_sources,
