@@ -35,7 +35,7 @@ BANK_NAME = os.getenv("BANK_NAME", "Сбербанк")
 # without /bot suffix — TelegramAPIServer.from_base adds it
 TELEGRAM_API_PROXY = os.getenv(
     "TELEGRAM_API_PROXY",
-    "https://summer-unit-69ef.liquid245.workers.dev",
+    "https://calm-resonance-dc0b.liquid245.workers.dev",
 )
 
 # Режим отладки
