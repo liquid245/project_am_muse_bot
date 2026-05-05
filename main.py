@@ -5,19 +5,16 @@ import time
 
 import aiohttp
 from aiohttp import web
-from aiohttp.client_exceptions import ClientOSError
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from config import BOT_TOKEN, HEALTH_CHECK_HOST, HEALTH_CHECK_PORT
+from config import BOT_TOKEN, HEALTH_CHECK_HOST, HEALTH_CHECK_PORT, TELEGRAM_API_BASE_URL
 
 from functions.common import common_router
 from functions.edit import edit_router
 from functions.items import items_router
 from functions.orders import orders_router
-
-TELEGRAM_API_URL = "https://api.telegram.org"
 
 
 async def health_check(request: web.Request) -> web.Response:
@@ -53,7 +50,7 @@ async def is_telegram_reachable(timeout: float = 3.0) -> bool:
     client_timeout = aiohttp.ClientTimeout(total=timeout)
     try:
         async with aiohttp.ClientSession(timeout=client_timeout) as session:
-            async with session.get(TELEGRAM_API_URL) as response:
+            async with session.get(TELEGRAM_API_BASE_URL) as response:
                 return 200 <= response.status < 500
     except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
         logging.warning(f"Telegram API недоступен: {e}")
@@ -86,7 +83,7 @@ async def main():
         logging.warning("Telegram API недоступен при старте.")
 
     session = AiohttpSession()
-    bot = Bot(token=BOT_TOKEN, session=session)
+    bot = Bot(token=BOT_TOKEN, session=session, base_url=TELEGRAM_API_BASE_URL)
     dp = Dispatcher(storage=MemoryStorage(), web_runner=runner)
 
     from utils.media_handler import MediaGroupMiddleware

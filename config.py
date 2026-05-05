@@ -31,5 +31,11 @@ BOT_USERNAME = os.getenv("BOT_USERNAME", "project_am_muse_bot")
 PHONE_NUMBER = os.getenv("PHONE_NUMBER", "+79000000000")
 BANK_NAME = os.getenv("BANK_NAME", "Сбербанк")
 
+# Прокси для Telegram API (Cloudflare Worker)
+TELEGRAM_API_BASE_URL = os.getenv(
+    "TELEGRAM_API_BASE_URL",
+    "https://summer-unit-69ef.liquid245.workers.dev/bot",
+)
+
 # Режим отладки
 DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "t")
