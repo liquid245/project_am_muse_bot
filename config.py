@@ -32,9 +32,10 @@ PHONE_NUMBER = os.getenv("PHONE_NUMBER", "+79000000000")
 BANK_NAME = os.getenv("BANK_NAME", "Сбербанк")
 
 # Прокси для Telegram API (Cloudflare Worker)
-TELEGRAM_API_BASE_URL = os.getenv(
-    "TELEGRAM_API_BASE_URL",
-    "https://summer-unit-69ef.liquid245.workers.dev/bot",
+# without /bot suffix — TelegramAPIServer.from_base adds it
+TELEGRAM_API_PROXY = os.getenv(
+    "TELEGRAM_API_PROXY",
+    "https://summer-unit-69ef.liquid245.workers.dev",
 )
 
 # Режим отладки

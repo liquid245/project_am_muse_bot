@@ -7,9 +7,10 @@ import aiohttp
 from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.client.telegram import TelegramAPIServer
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from config import BOT_TOKEN, HEALTH_CHECK_HOST, HEALTH_CHECK_PORT, TELEGRAM_API_BASE_URL
+from config import BOT_TOKEN, HEALTH_CHECK_HOST, HEALTH_CHECK_PORT, TELEGRAM_API_PROXY
 
 from functions.common import common_router
 from functions.edit import edit_router
@@ -50,8 +51,8 @@ async def is_telegram_reachable(timeout: float = 3.0) -> bool:
     client_timeout = aiohttp.ClientTimeout(total=timeout)
     try:
         async with aiohttp.ClientSession(timeout=client_timeout) as session:
-            async with session.get(TELEGRAM_API_BASE_URL) as response:
-                return 200 <= response.status < 500
+            async with session.get(TELEGRAM_API_PROXY) as response:
+                return response.status < 500
     except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
         logging.warning(f"Telegram API недоступен: {e}")
         return False
@@ -82,8 +83,9 @@ async def main():
     if not tg_ok:
         logging.warning("Telegram API недоступен при старте.")
 
-    session = AiohttpSession()
-    bot = Bot(token=BOT_TOKEN, session=session, base_url=TELEGRAM_API_BASE_URL)
+    proxy_api = TelegramAPIServer.from_base(TELEGRAM_API_PROXY)
+    session = AiohttpSession(api=proxy_api)
+    bot = Bot(token=BOT_TOKEN, session=session)
     dp = Dispatcher(storage=MemoryStorage(), web_runner=runner)
 
     from utils.media_handler import MediaGroupMiddleware
