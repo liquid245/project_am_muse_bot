@@ -212,7 +212,7 @@ async def process_receipt(message: types.Message, state: FSMContext):
             logging.warning(f"Не удалось скрыть кнопку отмены: {edit_error}")
 
 # Формируем полный отчет для админа
-order_details = (
+    order_details = (
         f"‼️ <b>Проверьте подлинность чека об оплате!</b>\n\n"
         f"🆔 <b>Заказ:</b> #{data['order_id']}\n"
         f"📦 <b>Товар:</b> {data['order_item_title']} (ID: <code>{data['order_item_id']}</code>)\n"
