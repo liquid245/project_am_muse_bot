@@ -225,22 +225,22 @@ async def process_receipt(message: types.Message, state: FSMContext):
 
     # Уведомляем админа
     try:
-        if message.photo:
-            await message.bot.send_photo(
-                chat_id=ADMIN_CHAT_ID,
-                photo=receipt_file_id,
-                caption=order_details,
-                message_thread_id=ADMIN_TOPIC_ID,
-                parse_mode="HTML",
-            )
-        else:
-            await message.bot.send_document(
-                chat_id=ADMIN_CHAT_ID,
-                document=receipt_file_id,
-                caption=order_details,
-                message_thread_id=ADMIN_TOPIC_ID,
-                parse_mode="HTML",
-            )
+        # Сначала отправляем детали заказа отдельным сообщением
+        await message.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=order_details,
+            message_thread_id=ADMIN_TOPIC_ID,
+            parse_mode="HTML",
+        )
+
+        # Затем пересылаем оригинальное сообщение пользователя с чеком,
+        # чтобы менеджер мог ответить на него одной кнопкой
+        await message.bot.forward_message(
+            chat_id=ADMIN_CHAT_ID,
+            message_thread_id=ADMIN_TOPIC_ID,
+            from_chat_id=message.chat.id,
+            message_id=message.message_id,
+        )
 
         await message.answer(
             "✅ Спасибо! Ваш заказ и чек переданы мастеру. Мы свяжемся с вами после проверки."
@@ -249,9 +249,31 @@ async def process_receipt(message: types.Message, state: FSMContext):
 
     except Exception as e:
         logging.error(f"Ошибка при уведомлении админа об оплате: {e}")
-        await message.answer(
-            "❌ Произошла ошибка при отправке чека. Пожалуйста, попробуйте отправить еще раз или свяжитесь с мастером напрямую."
-        )
+        # Fallback: пробуем отправить файл от имени бота
+        try:
+            if message.photo:
+                await message.bot.send_photo(
+                    chat_id=ADMIN_CHAT_ID,
+                    photo=receipt_file_id,
+                    caption=order_details,
+                    message_thread_id=ADMIN_TOPIC_ID,
+                    parse_mode="HTML",
+                )
+            else:
+                await message.bot.send_document(
+                    chat_id=ADMIN_CHAT_ID,
+                    document=receipt_file_id,
+                    caption=order_details,
+                    message_thread_id=ADMIN_TOPIC_ID,
+                    parse_mode="HTML",
+                )
+            await message.answer(
+                "✅ Спасибо! Ваш заказ и чек переданы мастеру (файл переслан от имени бота)."
+            )
+        except Exception:
+            await message.answer(
+                "❌ Произошла ошибка при отправке чека. Пожалуйста, попробуйте отправить еще раз или свяжитесь с мастером напрямую."
+            )
 
 
 @orders_router.message(OrderForm.waiting_for_receipt)
