@@ -23,7 +23,7 @@ CATALOG_FILE = "docs/catalog/catalog.json"
 IMAGES_DIR = "docs/catalog/images"
 
 # Ссылка на сайт
-SITE_URL = os.getenv("SITE_ADRESS", "https://liquid245.github.io/project_am_muse/")
+SITE_URL = os.getenv("SITE_ADRESS", "https://am-muse.ru")
 MASTER_USERNAME = os.getenv("MASTER_USERNAME", "baegon")
 BOT_USERNAME = os.getenv("BOT_USERNAME", "project_am_muse_bot")
 
