@@ -1,11 +1,38 @@
 import os
+import platform
+import subprocess
 from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _keychain_get(label: str) -> str | None:
+    """Читает пароль из macOS Keychain по метке."""
+    if platform.system() != "Darwin":
+        return None
+    try:
+        result = subprocess.run(
+            ["security", "find-generic-password", "-w", "-l", label],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return None
+
+
+def _get_secret(env_name: str, keychain_label: str) -> str | None:
+    """Сначала os.getenv, затем Keychain (macOS)."""
+    val = os.getenv(env_name)
+    if val:
+        return val
+    return _keychain_get(keychain_label)
+
+
 # Токены
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+BOT_TOKEN = _get_secret("BOT_TOKEN", "telegram-bot-api-token-am-muse")
+GITHUB_TOKEN = _get_secret("GITHUB_TOKEN", "github-general-api-token")
 REPO_NAME = os.getenv("REPO_NAME", "liquid245/project_am_muse")
 
 # Роли и ID
