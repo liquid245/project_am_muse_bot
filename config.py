@@ -32,7 +32,7 @@ def _get_secret(env_name: str, keychain_label: str) -> str | None:
 
 # Токены
 BOT_TOKEN = _get_secret("BOT_TOKEN", "telegram-bot-api-token-am-muse")
-GITHUB_TOKEN = _get_secret("GITHUB_TOKEN", "github-general-api-token")
+GITHUB_TOKEN = _get_secret("GITHUB_TOKEN", "github-api-token-am-muse-bot")
 REPO_NAME = os.getenv("REPO_NAME", "liquid245/project_am_muse")
 
 # Роли и ID
