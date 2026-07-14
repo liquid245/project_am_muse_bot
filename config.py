@@ -5,7 +5,7 @@ load_dotenv()
 
 
 # Токены
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN") or os.getenv("BOT_TOKEN_1")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = os.getenv("REPO_NAME", "liquid245/project_am_muse")
 
