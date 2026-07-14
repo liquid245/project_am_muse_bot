@@ -4,7 +4,7 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
-EXPOSE 7860
+EXPOSE 8080
 
 COPY bot/requirements.txt bot/requirements.txt
 

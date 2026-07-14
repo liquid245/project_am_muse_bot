@@ -1,11 +1,7 @@
+# Project AM Muse — Telegram Bot
 
----
-title: project_am_muse
-emoji: 🤖
-colorFrom: blue
-colorTo: green
-sdk: docker
-app_file: Dockerfile
-pinned: false
----
+Telegram bot for AM Muse brooch catalog. Built with aiogram 3.
 
+- Manages catalog via GitHub API (PyGithub)
+- Handles orders with FSM states
+- Hosted on Bothost

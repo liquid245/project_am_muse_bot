@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import signal
-import time
+from functools import partial
 
 import aiohttp
 from aiohttp import web
@@ -9,8 +9,16 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
-from config import BOT_TOKEN, HEALTH_CHECK_HOST, HEALTH_CHECK_PORT, TELEGRAM_API_PROXY
+from config import (
+    BOT_TOKEN,
+    HOST,
+    PORT,
+    TELEGRAM_API_PROXY,
+    WEBHOOK_URL,
+    WEBHOOK_PATH,
+)
 
 from functions.common import common_router
 from functions.edit import edit_router
@@ -22,7 +30,9 @@ async def health_check(request: web.Request) -> web.Response:
     return web.Response(text="OK")
 
 
-async def on_startup(bot: Bot):
+async def on_startup(bot: Bot, webhook_url: str | None = None):
+    if webhook_url:
+        await bot.set_webhook(url=webhook_url)
     try:
         bot_info = await bot.get_me()
         logging.info(f"Бот запущен: @{bot_info.username} (ID: {bot_info.id})")
@@ -30,18 +40,14 @@ async def on_startup(bot: Bot):
         logging.warning(f"Не удалось получить информацию о боте при старте: {e}")
 
 
-async def on_shutdown(bot: Bot, web_runner: web.AppRunner):
+async def on_shutdown(bot: Bot):
     logging.warning("Начало процедуры остановки...")
     try:
+        await bot.delete_webhook()
         bot_info = await bot.get_me()
         bot_name = f"@{bot_info.username} (ID: {bot_info.id})"
     except Exception:
         bot_name = "неизвестен"
-
-    logging.info("Остановка health check сервера...")
-    await web_runner.cleanup()
-    logging.info("Health check сервер остановлен.")
-
     logging.warning(f"Бот остановлен: {bot_name}")
     await bot.session.close()
     logging.info("Сессия бота закрыта.")
@@ -58,26 +64,15 @@ async def is_telegram_reachable(timeout: float = 3.0) -> bool:
         return False
 
 
-async def start_health_check_server() -> web.AppRunner:
-    app = web.Application()
-    app.router.add_get("/", health_check)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, HEALTH_CHECK_HOST, HEALTH_CHECK_PORT)
-    await site.start()
-    logging.info(f"Health check сервер запущен на http://{HEALTH_CHECK_HOST}:{HEALTH_CHECK_PORT}")
-    return runner
-
-
 async def main():
-    start_time = time.monotonic()
     logging.info("Запуск main()...")
 
     if not BOT_TOKEN:
         logging.critical("BOT_TOKEN не найден! Бот не может быть запущен.")
         return
-
-    runner = await start_health_check_server()
+    if not WEBHOOK_URL:
+        logging.critical("WEBHOOK_URL не задан! Укажите URL от Bothost.")
+        return
 
     tg_ok = await is_telegram_reachable()
     if not tg_ok:
@@ -86,12 +81,14 @@ async def main():
     proxy_api = TelegramAPIServer.from_base(TELEGRAM_API_PROXY)
     session = AiohttpSession(api=proxy_api)
     bot = Bot(token=BOT_TOKEN, session=session)
-    dp = Dispatcher(storage=MemoryStorage(), web_runner=runner)
+    dp = Dispatcher(storage=MemoryStorage())
 
     from utils.media_handler import MediaGroupMiddleware
     dp.message.middleware(MediaGroupMiddleware())
 
-    dp.startup.register(on_startup)
+    webhook_url = f"{WEBHOOK_URL.rstrip('/')}{WEBHOOK_PATH}"
+
+    dp.startup.register(partial(on_startup, webhook_url=webhook_url))
     dp.shutdown.register(on_shutdown)
 
     dp.include_router(common_router)
@@ -99,13 +96,21 @@ async def main():
     dp.include_router(edit_router)
     dp.include_router(orders_router)
 
-    elapsed = time.monotonic() - start_time
-    logging.info(f"Инициализация завершена за {elapsed:.1f}с. Запуск polling...")
+    app = web.Application()
 
-    try:
-        await dp.start_polling(bot)
-    except Exception as e:
-        logging.error(f"Polling завершился с ошибкой: {e}", exc_info=True)
+    app.router.add_get("/", health_check)
+    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
+    setup_application(app, dp, bot=bot)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, HOST, PORT)
+    await site.start()
+
+    logging.info(f"Сервер запущен на http://{HOST}:{PORT}")
+    logging.info(f"Webhook URL: {webhook_url}")
+
+    await asyncio.Event().wait()
 
 
 def handle_exception(loop, context):
