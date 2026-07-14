@@ -19,9 +19,16 @@ ADMIN_TOPIC_ID = int(os.getenv("ADMIN_TOPIC_ID", "43"))
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8080"))
 
-# Webhook (Bothost выдаёт URL при создании проекта)
+# Идентификаторы Bothost (автоматически инжектятся платформой)
+DOMAIN = os.getenv("DOMAIN", "")
+BOT_ID = os.getenv("BOT_ID", "")
+
+# Webhook: авто-построение из DOMAIN (Bothost) или из переменной (ручной режим)
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
+
+if not WEBHOOK_URL and DOMAIN:
+    WEBHOOK_URL = f"https://{DOMAIN}"
 
 # Константы путей
 CATALOG_FILE = "docs/catalog/catalog.json"
