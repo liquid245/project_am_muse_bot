@@ -70,9 +70,6 @@ async def main():
     if not BOT_TOKEN:
         logging.critical("BOT_TOKEN не найден! Бот не может быть запущен.")
         return
-    if not WEBHOOK_URL:
-        logging.critical("WEBHOOK_URL не задан! Укажите URL от Bothost.")
-        return
 
     tg_ok = await is_telegram_reachable()
     if not tg_ok:
@@ -86,15 +83,23 @@ async def main():
     from utils.media_handler import MediaGroupMiddleware
     dp.message.middleware(MediaGroupMiddleware())
 
-    webhook_url = f"{WEBHOOK_URL.rstrip('/')}{WEBHOOK_PATH}"
-
-    dp.startup.register(partial(on_startup, webhook_url=webhook_url))
-    dp.shutdown.register(on_shutdown)
-
     dp.include_router(common_router)
     dp.include_router(items_router)
     dp.include_router(edit_router)
     dp.include_router(orders_router)
+
+    if WEBHOOK_URL:
+        await _run_webhook(bot, dp)
+    else:
+        logging.info("WEBHOOK_URL не задан — запуск в режиме Polling (разработка).")
+        await _run_polling(bot, dp)
+
+
+async def _run_webhook(bot: Bot, dp: Dispatcher):
+    webhook_url = f"{WEBHOOK_URL.rstrip('/')}{WEBHOOK_PATH}"
+
+    dp.startup.register(partial(on_startup, webhook_url=webhook_url))
+    dp.shutdown.register(on_shutdown)
 
     app = web.Application()
 
@@ -111,6 +116,17 @@ async def main():
     logging.info(f"Webhook URL: {webhook_url}")
 
     await asyncio.Event().wait()
+
+
+async def _run_polling(bot: Bot, dp: Dispatcher):
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
+
+    logging.info("Запуск polling...")
+    try:
+        await dp.start_polling(bot)
+    except Exception as e:
+        logging.error(f"Polling завершился с ошибкой: {e}", exc_info=True)
 
 
 def handle_exception(loop, context):
