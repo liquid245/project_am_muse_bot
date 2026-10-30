@@ -73,6 +73,9 @@ async def main():
         logging.critical("BOT_TOKEN не найден! Бот не может быть запущен.")
         return
 
+    # Диагностика без утечки: id бота виден в логах — сразу ясно, тот ли токен в окружении.
+    logging.info(f"BOT_TOKEN: id={BOT_TOKEN.split(':')[0]} (9241423472 — актуальный @am_muse_bot)")
+
     tg_ok = await is_telegram_reachable()
     if not tg_ok:
         logging.warning("Telegram API недоступен при старте.")
