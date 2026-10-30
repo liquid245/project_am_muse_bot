@@ -89,13 +89,14 @@ def describe_token(name: str, raw: str) -> str:
 def _token_candidates() -> list[tuple[str, str]]:
     """Пары (имя переменной, сырое значение) в порядке приоритета, без дублей по значению.
 
+    Порядок: BOT_TOKEN_2 → BOT_TOKEN_1 → BOT_TOKEN.
     На Bothost BOT_TOKEN — системное поле, которое правкой env не изменить, и в нём
-    может лежать мёртвый токен. Поэтому кандидатов два, и рабочий выбирается живой
+    может лежать мёртвый токен. Поэтому кандидатов три, и рабочий выбирается живой
     проверкой get_me, а не порядком переменных.
     """
     candidates: list[tuple[str, str]] = []
     seen: set[str] = set()
-    for name in ("BOT_TOKEN_1", "BOT_TOKEN"):
+    for name in ("BOT_TOKEN_2", "BOT_TOKEN_1", "BOT_TOKEN"):
         raw = os.getenv(name) or ""
         value = raw.strip()
         if value and value not in seen:

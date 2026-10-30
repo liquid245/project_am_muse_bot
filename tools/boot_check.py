@@ -15,7 +15,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 os.environ["BOT_TOKEN"] = "999999:DEADdeadDEADdeadDEADdeadDEADdeadDEAD"
-os.environ["BOT_TOKEN_1"] = "424242:AAFakeFakeFakeFakeFakeFakeFakeFakeFake"
+os.environ["BOT_TOKEN_1"] = "888888:DEADdeadDEADdeadDEADdeadDEADdeadDEAD"
+os.environ["BOT_TOKEN_2"] = "424242:AAFakeFakeFakeFakeFakeFakeFakeFakeFake"
 os.environ["WEBHOOK_URL"] = "https://bot-123.bothost.ru"
 os.environ["PORT"] = "18081"
 os.environ["WEBHOOK_SECRET"] = "boot-check-secret"
@@ -77,8 +78,8 @@ async def run() -> int:
         print("FAIL  сервер не поднялся за 20с")
         return 1
 
-    results.append(("мёртвый BOT_TOKEN отброшен, взят живой BOT_TOKEN_1",
-                    botmain._token_candidates()[0][0] == "BOT_TOKEN_1"))
+    results.append(("мёртвые BOT_TOKEN/BOT_TOKEN_1 отброшены, взят живой BOT_TOKEN_2",
+                    botmain._token_candidates()[0][0] == "BOT_TOKEN_2"))
 
     results.append(("startup вызвал set_webhook", bool(captured.get("url"))))
     results.append(("set_webhook передан secret_token",
