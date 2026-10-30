@@ -6,6 +6,9 @@ import secrets
 import signal
 from functools import partial
 
+# Метка сборки: печатается в лог при старте — сразу видно, какой код в контейнере.
+BUILD = "v6-token-order-2-1-base"
+
 import aiohttp
 from aiohttp import web
 from aiogram import Bot, Dispatcher
@@ -138,7 +141,7 @@ async def _pick_bot(proxy_api: TelegramAPIServer) -> Bot | None:
 
 
 async def main():
-    logging.info("Запуск main()...")
+    logging.info(f"Запуск main()... код: {BUILD}")
 
     tg_ok = await is_telegram_reachable()
     if not tg_ok:
