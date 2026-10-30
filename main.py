@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 import os
 import secrets
@@ -67,8 +68,26 @@ async def is_telegram_reachable(timeout: float = 3.0) -> bool:
         return False
 
 
+def describe_token(name: str, raw: str) -> str:
+    """Отпечаток токена для лога: полный токен не печатаем никогда.
+
+    Даёт всё для сверки: id бота (часть до ':' — не секрет), длина, последние 4 символа,
+    sha256[:8] и сколько невидимых символов срезал strip (частая причина 401).
+    """
+    token = raw.strip()
+    if not token:
+        return f"{name}: ПУСТАЯ (len(raw)={len(raw)})"
+    bot_id = token.split(":", 1)[0] if ":" in token else "НЕТ_ДВОЕТОЧИЯ"
+    digest = hashlib.sha256(token.encode()).hexdigest()[:8]
+    invisible = len(raw) - len(token)
+    return (
+        f"{name}: id={bot_id} len={len(token)} tail=...{token[-4:]} "
+        f"sha256_8={digest} невидимых_символов={invisible}"
+    )
+
+
 def _token_candidates() -> list[tuple[str, str]]:
-    """Пары (имя переменной, токен) в порядке приоритета, без дублей по значению.
+    """Пары (имя переменной, сырое значение) в порядке приоритета, без дублей по значению.
 
     На Bothost BOT_TOKEN — системное поле, которое правкой env не изменить, и в нём
     может лежать мёртвый токен. Поэтому кандидатов два, и рабочий выбирается живой
@@ -77,10 +96,13 @@ def _token_candidates() -> list[tuple[str, str]]:
     candidates: list[tuple[str, str]] = []
     seen: set[str] = set()
     for name in ("BOT_TOKEN_1", "BOT_TOKEN"):
-        value = (os.getenv(name) or "").strip()
+        raw = os.getenv(name) or ""
+        value = raw.strip()
         if value and value not in seen:
             seen.add(value)
-            candidates.append((name, value))
+            candidates.append((name, raw))
+        elif not value:
+            logging.warning(f"{name}: НЕ ЗАДАНА в окружении контейнера")
     return candidates
 
 
@@ -91,21 +113,26 @@ async def _pick_bot(proxy_api: TelegramAPIServer) -> Bot | None:
         logging.critical("Токен не найден: ни BOT_TOKEN_1, ни BOT_TOKEN не заданы.")
         return None
 
-    for name, token in candidates:
+    for name, raw in candidates:
+        token = raw.strip()
+        logging.info(describe_token(name, raw))
         candidate = Bot(token=token, session=AiohttpSession(api=proxy_api))
         try:
             me = await candidate.get_me()
         except TelegramUnauthorizedError:
-            logging.warning(f"Токен из {name} невалиден (Unauthorized) — пробую следующий.")
+            logging.warning(f"{name}: невалиден (401) — пробую следующий кандидат.")
             await candidate.session.close()
             continue
         except Exception as exc:  # сеть/таймаут: не приговор токену
-            logging.warning(f"Проверка токена из {name} не удалась ({exc}) — использую его как есть.")
+            logging.warning(f"{name}: проверка не удалась ({exc}) — использую как есть.")
             return candidate
-        logging.info(f"Токен из {name}: @{me.username} (id {me.id})")
+        logging.info(f"ИСПОЛЬЗУЮ {name}: @{me.username} (id {me.id}) — id={name}")
         return candidate
 
-    logging.critical("Все токены из окружения невалидны (401). Обнови токен в настройках бота.")
+    logging.critical(
+        "Все токены из окружения невалидны (401). "
+        "Сверь sha256_8 и tail с эталонным отпечатком актуального @am_muse_bot."
+    )
     return None
 
 
