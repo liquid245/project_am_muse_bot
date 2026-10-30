@@ -14,13 +14,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-os.environ["BOT_TOKEN"] = "424242:AAFakeFakeFakeFakeFakeFakeFakeFakeFake"
+os.environ["BOT_TOKEN"] = "999999:DEADdeadDEADdeadDEADdeadDEADdeadDEAD"
+os.environ["BOT_TOKEN_1"] = "424242:AAFakeFakeFakeFakeFakeFakeFakeFakeFake"
 os.environ["WEBHOOK_URL"] = "https://bot-123.bothost.ru"
 os.environ["PORT"] = "18081"
 os.environ["WEBHOOK_SECRET"] = "boot-check-secret"
 
 import aiohttp
 from aiogram import Bot
+from aiogram.exceptions import TelegramUnauthorizedError
 from aiogram.types import User
 
 captured: dict = {}
@@ -33,7 +35,10 @@ async def fake_set_webhook(self, url, **kwargs):
 
 
 async def fake_get_me(self):
-    return User(id=1, is_bot=True, first_name="Fake", username="am_muse_bot")
+    """Мёртвый токен (содержит DEAD) даёт 401, живой — возвращает бота."""
+    if "DEAD" in self.token:
+        raise TelegramUnauthorizedError(method=None, message="Telegram server says - Unauthorized")
+    return User(id=9241423472, is_bot=True, first_name="Fake", username="am_muse_bot")
 
 
 Bot.set_webhook = fake_set_webhook
@@ -71,6 +76,9 @@ async def run() -> int:
         task.cancel()
         print("FAIL  сервер не поднялся за 20с")
         return 1
+
+    results.append(("мёртвый BOT_TOKEN отброшен, взят живой BOT_TOKEN_1",
+                    botmain._token_candidates()[0][0] == "BOT_TOKEN_1"))
 
     results.append(("startup вызвал set_webhook", bool(captured.get("url"))))
     results.append(("set_webhook передан secret_token",

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import secrets
 import signal
 from functools import partial
@@ -9,11 +10,11 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
+from aiogram.exceptions import TelegramUnauthorizedError
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 from config import (
-    BOT_TOKEN,
     HOST,
     PORT,
     TELEGRAM_API_PROXY,
@@ -66,23 +67,59 @@ async def is_telegram_reachable(timeout: float = 3.0) -> bool:
         return False
 
 
+def _token_candidates() -> list[tuple[str, str]]:
+    """Пары (имя переменной, токен) в порядке приоритета, без дублей по значению.
+
+    На Bothost BOT_TOKEN — системное поле, которое правкой env не изменить, и в нём
+    может лежать мёртвый токен. Поэтому кандидатов два, и рабочий выбирается живой
+    проверкой get_me, а не порядком переменных.
+    """
+    candidates: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for name in ("BOT_TOKEN_1", "BOT_TOKEN"):
+        value = (os.getenv(name) or "").strip()
+        if value and value not in seen:
+            seen.add(value)
+            candidates.append((name, value))
+    return candidates
+
+
+async def _pick_bot(proxy_api: TelegramAPIServer) -> Bot | None:
+    """Возвращает Bot с первым живым токеном. Мёртвый (401) отбрасывается."""
+    candidates = _token_candidates()
+    if not candidates:
+        logging.critical("Токен не найден: ни BOT_TOKEN_1, ни BOT_TOKEN не заданы.")
+        return None
+
+    for name, token in candidates:
+        candidate = Bot(token=token, session=AiohttpSession(api=proxy_api))
+        try:
+            me = await candidate.get_me()
+        except TelegramUnauthorizedError:
+            logging.warning(f"Токен из {name} невалиден (Unauthorized) — пробую следующий.")
+            await candidate.session.close()
+            continue
+        except Exception as exc:  # сеть/таймаут: не приговор токену
+            logging.warning(f"Проверка токена из {name} не удалась ({exc}) — использую его как есть.")
+            return candidate
+        logging.info(f"Токен из {name}: @{me.username} (id {me.id})")
+        return candidate
+
+    logging.critical("Все токены из окружения невалидны (401). Обнови токен в настройках бота.")
+    return None
+
+
 async def main():
     logging.info("Запуск main()...")
-
-    if not BOT_TOKEN:
-        logging.critical("BOT_TOKEN не найден! Бот не может быть запущен.")
-        return
-
-    # Диагностика без утечки: id бота виден в логах — сразу ясно, тот ли токен в окружении.
-    logging.info(f"BOT_TOKEN: id={BOT_TOKEN.split(':')[0]} (9241423472 — актуальный @am_muse_bot)")
 
     tg_ok = await is_telegram_reachable()
     if not tg_ok:
         logging.warning("Telegram API недоступен при старте.")
 
     proxy_api = TelegramAPIServer.from_base(TELEGRAM_API_PROXY)
-    session = AiohttpSession(api=proxy_api)
-    bot = Bot(token=BOT_TOKEN, session=session)
+    bot = await _pick_bot(proxy_api)
+    if bot is None:
+        return
     dp = Dispatcher(storage=MemoryStorage())
 
     from utils.media_handler import MediaGroupMiddleware
