@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import secrets
 import signal
 from functools import partial
 
@@ -16,6 +17,7 @@ from config import (
     HOST,
     PORT,
     TELEGRAM_API_PROXY,
+    WEBHOOK_SECRET,
     WEBHOOK_URL,
     WEBHOOK_PATH,
 )
@@ -30,9 +32,9 @@ async def health_check(request: web.Request) -> web.Response:
     return web.Response(text="OK")
 
 
-async def on_startup(bot: Bot, webhook_url: str | None = None):
+async def on_startup(bot: Bot, webhook_url: str | None = None, secret_token: str | None = None):
     if webhook_url:
-        await bot.set_webhook(url=webhook_url)
+        await bot.set_webhook(url=webhook_url, secret_token=secret_token)
     try:
         bot_info = await bot.get_me()
         logging.info(f"Бот запущен: @{bot_info.username} (ID: {bot_info.id})")
@@ -95,16 +97,30 @@ async def main():
         await _run_polling(bot, dp)
 
 
+def _resolve_webhook_secret() -> str:
+    """Секрет вебхука. Без него любой POST на WEBHOOK_PATH обрабатывается как апдейт Telegram."""
+    secret = (WEBHOOK_SECRET or "").strip()
+    if secret:
+        return secret
+    generated = secrets.token_urlsafe(32)
+    logging.warning(
+        "WEBHOOK_SECRET не задан — сгенерирован временный секрет. "
+        "Задай WEBHOOK_SECRET в переменных окружения, иначе он меняется при каждом рестарте."
+    )
+    return generated
+
+
 async def _run_webhook(bot: Bot, dp: Dispatcher):
     webhook_url = f"{WEBHOOK_URL.rstrip('/')}{WEBHOOK_PATH}"
+    secret = _resolve_webhook_secret()
 
-    dp.startup.register(partial(on_startup, webhook_url=webhook_url))
+    dp.startup.register(partial(on_startup, webhook_url=webhook_url, secret_token=secret))
     dp.shutdown.register(on_shutdown)
 
     app = web.Application()
 
     app.router.add_get("/", health_check)
-    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
+    SimpleRequestHandler(dispatcher=dp, bot=bot, secret_token=secret).register(app, path=WEBHOOK_PATH)
     setup_application(app, dp, bot=bot)
 
     runner = web.AppRunner(app)

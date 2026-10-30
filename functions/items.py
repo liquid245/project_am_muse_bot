@@ -36,21 +36,21 @@ async def add_item_start(message: types.Message, state: FSMContext):
     await message.answer("Название товара:", reply_markup=get_cancel_inline())
 
 
-@items_router.message(ItemForm.title)
+@items_router.message(ItemForm.title, IsAdmin())
 async def process_title(message: types.Message, state: FSMContext):
     await state.update_data(title=message.text)
     await state.set_state(ItemForm.description)
     await message.answer("Описание:", reply_markup=get_cancel_inline())
 
 
-@items_router.message(ItemForm.description)
+@items_router.message(ItemForm.description, IsAdmin())
 async def process_desc(message: types.Message, state: FSMContext):
     await state.update_data(description=message.text)
     await state.set_state(ItemForm.price)
     await message.answer("Цена (только число):", reply_markup=get_cancel_inline())
 
 
-@items_router.message(ItemForm.price)
+@items_router.message(ItemForm.price, IsAdmin())
 async def process_price(message: types.Message, state: FSMContext):
     if not message.text.isdigit():
         return await message.answer("Пожалуйста, введите число.")
@@ -59,7 +59,7 @@ async def process_price(message: types.Message, state: FSMContext):
     await message.answer("Количество:", reply_markup=get_cancel_inline())
 
 
-@items_router.message(ItemForm.stock)
+@items_router.message(ItemForm.stock, IsAdmin())
 async def process_stock(message: types.Message, state: FSMContext):
     if not message.text.isdigit():
         return await message.answer("Пожалуйста, введите число.")
@@ -72,7 +72,7 @@ async def process_stock(message: types.Message, state: FSMContext):
     )
 
 
-@items_router.message(ItemForm.waiting_for_images, F.photo)
+@items_router.message(ItemForm.waiting_for_images, F.photo, IsAdmin())
 async def process_photos(
     message: types.Message, state: FSMContext, album: list[types.Message] = None
 ):
@@ -112,7 +112,7 @@ async def process_photos(
     )
 
 
-@items_router.callback_query(ItemForm.waiting_for_images, F.data == "save_images")
+@items_router.callback_query(ItemForm.waiting_for_images, F.data == "save_images", IsAdmin())
 async def save_item_final(callback: types.CallbackQuery, state: FSMContext):
     """Атомарно сохраняет все данные через StorageManager."""
     data = await state.get_data()

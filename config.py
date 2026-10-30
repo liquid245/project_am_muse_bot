@@ -26,6 +26,9 @@ BOT_ID = os.getenv("BOT_ID", "")
 # Webhook: авто-построение из DOMAIN (Bothost) или из переменной (ручной режим)
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
+# Секрет вебхука: Telegram присылает его в заголовке X-Telegram-Bot-Api-Secret-Token.
+# Без него эндпоинт принимает ЛЮБОЙ POST как апдейт от Telegram (подделка from_user.id = админ).
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 
 if not WEBHOOK_URL and DOMAIN:
     WEBHOOK_URL = f"https://{DOMAIN}"
@@ -37,7 +40,7 @@ IMAGES_DIR = "docs/catalog/images"
 # Ссылка на сайт
 SITE_URL = os.getenv("SITE_ADRESS", "https://am-muse.ru")
 MASTER_USERNAME = os.getenv("MASTER_USERNAME", "baegon")
-BOT_USERNAME = os.getenv("BOT_USERNAME", "project_am_muse_bot")
+BOT_USERNAME = os.getenv("BOT_USERNAME", "am_muse_bot")
 
 # Реквизиты для оплаты
 PHONE_NUMBER = os.getenv("PHONE_NUMBER", "+79000000000")
@@ -51,4 +54,4 @@ TELEGRAM_API_PROXY = os.getenv(
 )
 
 # Режим отладки
-DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "t")
+DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")

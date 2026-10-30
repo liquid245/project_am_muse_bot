@@ -37,12 +37,12 @@ async def start_delete_item_scenario(message: types.Message, state: FSMContext, 
         
     await state.set_state(ItemEditForm.confirm_delete)
 
-@edit_router.callback_query(ItemEditForm.main_menu, F.data == "delete_item_start")
+@edit_router.callback_query(ItemEditForm.main_menu, F.data == "delete_item_start", IsAdmin())
 async def process_delete_item_start_callback(callback: types.CallbackQuery, state: FSMContext):
     await start_delete_item_scenario(callback.message, state, edit_mode=True)
     await callback.answer()
 
-@edit_router.callback_query(ItemEditForm.confirm_delete, F.data == "delete_item_confirm")
+@edit_router.callback_query(ItemEditForm.confirm_delete, F.data == "delete_item_confirm", IsAdmin())
 async def process_delete_item_confirm(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     item = data.get("temp_item")
@@ -63,7 +63,7 @@ async def process_delete_item_confirm(callback: types.CallbackQuery, state: FSMC
     await state.clear()
     await callback.answer()
 
-@edit_router.callback_query(ItemEditForm.confirm_delete, F.data == "delete_item_cancel")
+@edit_router.callback_query(ItemEditForm.confirm_delete, F.data == "delete_item_cancel", IsAdmin())
 async def process_delete_item_cancel(callback: types.CallbackQuery, state: FSMContext):
     await show_edit_menu(callback.message, state, edit_mode=True)
     await callback.answer()
@@ -142,7 +142,7 @@ async def process_reorder_start(callback: types.CallbackQuery, state: FSMContext
     await show_reorder_menu(callback.message, state, edit_mode=True)
     await callback.answer()
 
-@edit_router.callback_query(ItemEditForm.waiting_for_order, F.data == "edit_move_up")
+@edit_router.callback_query(ItemEditForm.waiting_for_order, F.data == "edit_move_up", IsAdmin())
 async def process_move_up_in_order(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     items = data.get("catalog_items", [])
@@ -154,7 +154,7 @@ async def process_move_up_in_order(callback: types.CallbackQuery, state: FSMCont
         await show_reorder_menu(callback.message, state, edit_mode=True)
     await callback.answer()
 
-@edit_router.callback_query(ItemEditForm.waiting_for_order, F.data == "edit_move_down")
+@edit_router.callback_query(ItemEditForm.waiting_for_order, F.data == "edit_move_down", IsAdmin())
 async def process_move_down_in_order(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     items = data.get("catalog_items", [])
@@ -166,18 +166,18 @@ async def process_move_down_in_order(callback: types.CallbackQuery, state: FSMCo
         await show_reorder_menu(callback.message, state, edit_mode=True)
     await callback.answer()
 
-@edit_router.callback_query(ItemEditForm.waiting_for_order, F.data == "reorder_back")
+@edit_router.callback_query(ItemEditForm.waiting_for_order, F.data == "reorder_back", IsAdmin())
 async def process_reorder_back(callback: types.CallbackQuery, state: FSMContext):
     await show_edit_menu(callback.message, state, edit_mode=True)
     await callback.answer()
 
-@edit_router.callback_query(ItemEditForm.main_menu, F.data == "edit_prop_images")
+@edit_router.callback_query(ItemEditForm.main_menu, F.data == "edit_prop_images", IsAdmin())
 async def process_edit_images_start(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.answer("📎 Пришлите одну или несколько новых фотографий для товара (альбомом).")
     await state.set_state(ItemEditForm.waiting_for_new_images)
     await callback.answer()
 
-@edit_router.message(ItemEditForm.waiting_for_new_images, F.photo)
+@edit_router.message(ItemEditForm.waiting_for_new_images, F.photo, IsAdmin())
 async def process_new_photos(message: types.Message, state: FSMContext, album: list[types.Message] = None):
     """Заменяет старые фото новыми."""
     data = await state.get_data()
@@ -304,7 +304,7 @@ async def edit_list_start(message: types.Message):
     for item in catalog["items"][:10]:
         await send_item_card(message, item, is_admin=True)
 
-@edit_router.callback_query(ItemEditForm.main_menu, F.data.startswith("edit_prop_"))
+@edit_router.callback_query(ItemEditForm.main_menu, F.data.startswith("edit_prop_"), IsAdmin())
 async def process_edit_prop(callback: types.CallbackQuery, state: FSMContext):
     prop = callback.data.replace("edit_prop_", "")
     await state.update_data(current_prop=prop)
@@ -320,7 +320,7 @@ async def process_edit_prop(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(ItemEditForm.waiting_for_replacement)
     await callback.answer()
 
-@edit_router.message(ItemEditForm.waiting_for_replacement)
+@edit_router.message(ItemEditForm.waiting_for_replacement, IsAdmin())
 async def process_replacement(message: types.Message, state: FSMContext):
     data = await state.get_data()
     prop = data.get("current_prop")
@@ -337,7 +337,7 @@ async def process_replacement(message: types.Message, state: FSMContext):
     
     await show_edit_menu(message, state)
 
-@edit_router.callback_query(ItemEditForm.main_menu, F.data == "edit_save")
+@edit_router.callback_query(ItemEditForm.main_menu, F.data == "edit_save", IsAdmin())
 async def process_edit_save(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     temp_item = data.get("temp_item")
@@ -366,7 +366,7 @@ async def process_edit_save(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer()
 
-@edit_router.callback_query(ItemEditForm.main_menu, F.data == "edit_cancel")
+@edit_router.callback_query(ItemEditForm.main_menu, F.data == "edit_cancel", IsAdmin())
 async def process_edit_cancel(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.message.answer("❌ Редактирование отменено. Изменения не сохранены.")
