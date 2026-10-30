@@ -5,7 +5,9 @@ load_dotenv()
 
 
 # Токены
-BOT_TOKEN = os.getenv("BOT_TOKEN") or os.getenv("BOT_TOKEN_1")
+# BOT_TOKEN_1 — приоритет: на Bothost платформа сама инжектит BOT_TOKEN со своим значением,
+# поэтому явный токен из панели кладём в BOT_TOKEN_1.
+BOT_TOKEN = os.getenv("BOT_TOKEN_1") or os.getenv("BOT_TOKEN")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = os.getenv("REPO_NAME", "liquid245/project_am_muse")
 

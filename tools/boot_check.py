@@ -50,10 +50,27 @@ async def probe(target: str, headers: dict) -> int:
 
 async def run() -> int:
     task = asyncio.create_task(botmain.main())
-    await asyncio.sleep(2.0)  # ждём старт сервера и регистрацию вебхука
-
     base = "http://127.0.0.1:18081"
+
+    # ждём готовности сервера (сетевые проверки при старте занимают время)
+    ready = False
+    for _ in range(40):
+        await asyncio.sleep(0.5)
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.get(base + "/", timeout=aiohttp.ClientTimeout(total=2)) as r:
+                    if r.status == 200:
+                        ready = True
+                        break
+        except Exception:
+            continue
+
     results = []
+    results.append(("сервер поднялся и отвечает на GET /", ready))
+    if not ready:
+        task.cancel()
+        print("FAIL  сервер не поднялся за 20с")
+        return 1
 
     results.append(("startup вызвал set_webhook", bool(captured.get("url"))))
     results.append(("set_webhook передан secret_token",
